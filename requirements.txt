@@ -1,0 +1,15 @@
+fastapi>=0.115,<1
+uvicorn>=0.29,<1
+jinja2>=3.1,<4
+python-multipart>=0.0.18
+requests>=2.32,<3
+beautifulsoup4>=4.12,<5
+python-dotenv>=1,<2
+apscheduler>=3.10,<4
+pytz
+pypdf>=4
+openpyxl>=3.1
+xlrd>=2
+feedparser>=6
+psycopg2-binary>=2.9
+
