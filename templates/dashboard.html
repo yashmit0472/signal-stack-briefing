@@ -1,8 +1,221 @@
-{% extends 'base.html' %}{% macro job(k,t) %}<form method="post" action="/c/{{c}}/do/{{k}}"><button>{{t}}</button></form>{% endmacro %}{% block body %}<a href="/">All companies</a><h1>{{p.name}}</h1><a href="{{p.url}}">{{p.url}}</a><nav>{% for k,t in [('overview','Overview'),('profile','Profile & interview'),('sources','Signal Stack'),('feed','Intelligence feed'),('reports','Monday briefs'),('activity','Run history'),('settings','Settings')] %}<a class="{{'active' if k==tab}}" href="?tab={{k}}">{{t}}</a>{% endfor %}</nav>
-{% if tab=='overview' %}<div class="grid">{% for k,t in [('source','Sources'),('signal','Signals'),('brief','Briefs')] %}<article><span class="stat">{{data[k]|length}}</span>{{t}}</article>{% endfor %}</div><h2>Latest activity</h2>{% for x in data.run[:4] %}<article>{{x.job|title}} · {{x.status}} <small>{{x.created}}</small></article>{% else %}<p>Research begins after company setup.</p>{% endfor %}
-{% elif tab=='profile' %}<h2>Initial research</h2>{% for k,v in (p.research or {}).items() %}<details><summary>{{k|replace('_',' ')|title}}</summary><pre>{{v|tojson(indent=2)}}</pre></details>{% endfor %}<details><summary>Website evidence</summary><p>{{p.evidence}}</p></details><div class="tools">{{job('research','Research website')}}{{job('interview','Continue interview')}}</div><h2>Founder interview</h2>{% for q in data.question|sort(attribute='number') %}<article><strong>{{q.number}} / 10 · {{q.question}}</strong><form method="post" action="/c/{{c}}/do/answer"><input type="hidden" name="id" value="{{q.id}}"><textarea name="answer" placeholder="Leave blank to skip confidential information">{{q.answer or ''}}</textarea><button>Save answer</button></form></article>{% endfor %}<p>After editing business context, run the source audit to reassess existing sources and discover alternatives.</p>
-{% elif tab=='sources' %}<div class="tools">{{job('discover','Discover sources')}}{{job('monitor','Check approved sources')}}{{job('audit','Reassess sources')}}</div><details><summary>Add source</summary><form method="post" action="/c/{{c}}/do/add"><input required name="title" placeholder="Source name"><input required type="url" name="url" placeholder="URL"><select name="category">{% for k in cats %}<option>{{k}}</option>{% endfor %}</select><input required name="reason" placeholder="Reason to monitor"><button>Add candidate</button></form></details><details><summary>Upload internal evidence</summary><form method="post" enctype="multipart/form-data" action="/c/{{c}}/do/upload"><input required type="file" name="file" accept=".csv,.xls,.xlsx,.pdf,.txt"><label><input type="checkbox" name="consent">Allow Gemini to analyse this material</label><button>Import</button></form></details>{% for cat in cats %}<h2>{{cat}}</h2>{% for s in data.source if s.category==cat and s.status!='removed' %}<article><small>{{s.status|upper}} · {{s.competitor}}</small><h3><a href="{{s.url}}">{{s.title}}</a></h3>{{s.reason}}{% if s.discoveryEvidence %}<details><summary>Discovery evidence</summary>{{s.discoveryEvidence}}</details>{% endif %}{% if cat!='Internal' %}<form method="post" action="/c/{{c}}/do/source"><input type="hidden" name="id" value="{{s.id}}">{% if s.status!='approved' %}<button name="status" value="approved">Approve after reviewing terms</button>{% endif %} <button name="status" value="removed">Remove</button></form>{% endif %}</article>{% else %}<p>No active sources.</p>{% endfor %}{% endfor %}
-{% elif tab=='feed' %}<h2>Intelligence feed</h2><form><input type="hidden" name="tab" value="feed">{% for k in ['category','competitor','verification','impact','relevance'] %}<select aria-label="{{k}}" name="{{k}}"><option value="">{{k|title}}</option>{% for val in data.signal|map(attribute=k)|unique %}<option>{{val}}</option>{% endfor %}</select>{% endfor %}<input type="date" name="date"><button>Filter</button></form>{% for s in signals %}<article><small>{{s.category}} · {{s.discovered}} · {{s.verification}}</small><h3>{{s.event}}</h3><blockquote>{{s.quote}}</blockquote><a href="{{s.url}}">{{s.source}}</a><p>{{s.why}}</p><strong>{{s.action}}</strong><details><summary>Ranking {{s.rank}} / 30</summary>{% for k in ['relevance','impact','urgency','credibility','recency','novelty','strength'] %}{{k}} {{s[k]}}/5 · {% endfor %}</details></article>{% else %}<p>No matching evidence-backed signals.</p>{% endfor %}
-{% elif tab=='reports' %}<h2>Monday Morning Brief</h2>{{job('brief','Generate brief')}}{% for r in data.brief %}<article><a href="/c/{{c}}/report/{{r.id}}">{{r.created}} · {{r.signals|length}} signals</a></article>{% endfor %}
-{% elif tab=='activity' %}<h2>Run history</h2><a href="?tab=activity">Refresh status</a>{% for r in data.run %}<article><strong>{{r.job|title}} · {{r.status}}</strong> · {{'Scheduled' if r.scheduled else 'Manual'}}<br>{{r.created}} {{r.detail}}</article>{% endfor %}<h2>Source-health reports</h2>{% for r in data.audit %}<details><summary>{{r.created}}</summary><pre>{{r|tojson(indent=2)}}</pre></details>{% endfor %}<h2>Crawl history</h2>{% for r in data.crawl %}<article>{{r.source}} · {{r.status}} · {{r.created}}<br>{{r.collected or 0}} collected · {{r.duplicates}} duplicates {{r.detail}}</article>{% endfor %}
-{% elif tab=='settings' %}<h2>Monitoring settings</h2><form class="card" method="post" action="/c/{{c}}/do/settings">{% for k,t in [('zone','IANA time zone'),('time','Monday brief time'),('monitor_hours','Monitoring interval (hours)'),('refresh_days','Source refresh interval (days)'),('audit_day','Monthly audit day (1–28)')] %}<label>{{t}} <input required name="{{k}}" value="{{settings[k]}}"></label>{% endfor %}<label><input type="checkbox" name="enabled" {{'checked' if p.automation}}>Enable scheduled jobs</label><button>Save settings</button></form>{% endif %}{% endblock %}
+{% extends 'base.html' %}
+{% from 'readable.html' import content, problem %}
+{% macro job(kind, title) %}<form method="post" action="/c/{{c}}/do/{{kind}}"><button>{{title}}</button></form>{% endmacro %}
+{% block body %}
+<a href="/">← All companies</a>
+<h1>{{p.name}}</h1><a href="{{p.url}}" target="_blank" rel="noopener noreferrer">{{p.url}}</a>
+<nav>
+{% for k,t in [('overview','Overview'),('profile','Profile & interview'),('sources','Sources & competitors'),('feed','Intelligence feed'),('reports','Monday briefs'),('activity','Monitoring & audits'),('settings','Settings')] %}
+<a class="{{'active' if k==tab}}" href="?tab={{k}}">{{t}}</a>
+{% endfor %}
+</nav>
+{% if tab=='overview' %}
+  <div class="grid">
+  {% for k,t in [('source','Monitored and proposed sources'),('signal','Evidence-backed signals'),('brief','Saved briefs'),('document','Collected documents')] %}
+    <article><span class="stat">{{data[k]|length}}</span><small>{{t}}</small></article>
+  {% endfor %}
+  </div>
+  <div class="grid">
+    <article><small>ADAPTIVE INTERVIEW</small><h2>{{data.question|selectattr('answer','defined')|list|length}} / 10 answered</h2>
+    <p>Questions are generated one at a time from your research and answers.</p><a class="btn" href="?tab=profile">Continue interview</a></article>
+    <article><small>EXECUTIVE BRIEFING</small><h2>{{'Latest saved brief' if data.brief else 'Generate an evidence-first brief'}}</h2>
+    {% if data.brief %}<a class="btn" href="/c/{{c}}/report/{{data.brief[0].id}}">Open latest report</a>
+    {% else %}<a class="btn" href="?tab=reports">See briefing workflow</a>{% endif %}</article>
+  </div>
+  <h2>Run history</h2>
+  {% for run in data.run[:5] %}<article><strong>{{run.job|label}}</strong> · {{run.status|label}} <small>{{run.created|readable_date}}</small>{{problem(run.detail)}}</article>
+  {% else %}<p>No runs yet. Research begins on company creation.</p>{% endfor %}
+{% elif tab=='profile' %}
+  <h2>Initial research, with claims separated from assumptions</h2>
+  <p>Public pages can contain marketing claims. Treat them as reported statements until independently verified.</p>
+  {% for k,v in (p.research or {}).items() %}<details><summary>{{k|label}}</summary>{{content(v)}}</details>{% else %}<p>Research not yet complete.</p>{% endfor %}
+  <details><summary>Collected homepage evidence</summary><p>{{p.evidence}}</p><a href="{{p.research_url or p.url}}">Original page</a></details>
+  <div class="tools">{{job('research','Refresh research')}}{{job('interview','Generate next question')}}</div>
+  <h2>Company context and priorities</h2>
+  <form class="card" method="post" action="/c/{{c}}/do/context"><label>Operator context, customer geography, market and 6–12 month priorities<textarea name="context" placeholder="Example: We now focus on India; our growth priority is partnerships, not direct sales.">{{p.operator_context or ''}}</textarea></label><button>Save context & reassess source relevance</button></form>
+  <h2>Founder interview</h2><p>Only one new question is generated at a time. Edit an answer at any time; a blank answer explicitly skips confidential details. Questions you already answered remain available for review.</p>
+  {% for q in data.question|sort(attribute='number') %}
+  <article class="{{'pending-question' if q.answer is not defined else ''}}">
+    <small>QUESTION {{q.number}} / 10 · {{q.topic or 'Founder context'}}</small>
+    <h3>{{q.question}}</h3>
+    {% if q.followup_to %}<small>Follow-up area: {{q.followup_to}}</small>{% endif %}
+    <form method="post" action="/c/{{c}}/do/answer"><input type="hidden" name="id" value="{{q.id}}">
+      <textarea name="answer" placeholder="Your answer (optional for confidential information)">{{q.answer or ''}}</textarea>
+      <button>{{'Update answer' if q.answer is defined else 'Save answer & generate next question'}}</button>
+    </form>
+  </article>
+  {% else %}<p>No interview question generated yet. Select “Generate next question” above.</p>{% endfor %}
+  {% if data.question|length>=10 and (data.question|selectattr('answer','defined')|list|length)==10 %}<p class="success">Interview completed — all 10 questions recorded.</p>{% endif %}
+  <h2>Revisions and change history</h2>
+  {% for change in data.revision %}<details><summary>{{change.kind|default('Context revision')|label}} · {{change.created|readable_date}}</summary>
+    {% if change.question %}<p><strong>{{change.question}}</strong></p>{% endif %}
+    <p><strong>Before:</strong> {{change.previous or '(blank)'}}</p>
+    <p><strong>After:</strong> {{change.current or '(blank)'}}</p>
+    <p>See Monitoring & audits for reassessed relevance and suggested source changes.</p>
+  </details>{% else %}<p>No operator edits recorded yet.</p>{% endfor %}
+{% elif tab=='sources' %}
+  <h2>Source manager</h2>
+  <nav class="source-tabs" aria-label="Source intelligence categories">
+    {% for category in cats %}
+      <a class="source-tab {{'source-tab-active' if source_category==category else ''}}"
+         href="?tab=sources&amp;category={{category}}"
+         {% if source_category==category %}aria-current="page"{% endif %}>
+        <span>{{category}}</span>
+        <span class="source-tab-count" id="source-tab-count-{{category}}">{{data.source|selectattr('category','equalto',category)|rejectattr('status','equalto','removed')|list|length}}</span>
+      </a>
+    {% endfor %}
+  </nav>
+  <p>Discovery finds <strong>candidates</strong>; it does not collect evidence. Approve relevant public sources and then monitor them before creating a brief.</p>
+  <p class="note" id="pipeline-status"><strong>Pipeline status:</strong> {{coverage.candidates}} awaiting approval · {{coverage.approved_public}} approved public sources · {{coverage.checked_public}} successfully checked · {{coverage.documents}} saved documents · {{coverage.signals}} source-backed signals.</p>
+  <div class="tools">{{job('discover','Discover candidate sources')}}{{job('monitor','Monitor approved sources')}}{{job('audit','Audit and suggest changes')}}</div>
+  {% set category=source_category %}
+  {% if category!='Internal' %}
+  {% set proposed_count=data.source|selectattr('category','equalto',category)|selectattr('status','equalto','proposed')|list|length %}
+  <div class="source-bulk-actions" id="source-bulk-actions">
+    {% if proposed_count %}
+    <form method="post" action="/c/{{c}}/do/approve-all" data-source-action="bulk" data-count="{{proposed_count}}">
+      <input type="hidden" name="category" value="{{category}}">
+      <button type="submit">Approve all proposed ({{proposed_count}})</button>
+    </form>
+    <small>Review source URLs and relevance first. This approves only proposed sources in {{category}}; monitoring runs separately.</small>
+    {% else %}
+    <p class="muted">No proposed {{category|lower}} sources awaiting approval.</p>
+    {% endif %}
+  </div>
+  {% endif %}
+  <p class="source-action-feedback" id="source-action-feedback" role="status" aria-live="polite" hidden></p>
+  <section class="source-category-panel" id="source-manager-panel" aria-label="{{category}} sources">
+    <h2 id="source-category-heading">{{category}} <small>· {{data.source|selectattr('category','equalto',category)|selectattr('status','equalto','proposed')|list|length}} proposed · {{data.source|selectattr('category','equalto',category)|selectattr('status','equalto','approved')|list|length}} approved</small></h2>
+    {% if category=='Internal' %}
+      <details><summary>Upload internal intelligence (CSV, Excel, PDF or TXT)</summary>
+        <p>All readable pages or rows are divided into labelled evidence chunks. AI analysis is optional and requires your consent to send the extracted text to the configured model provider.</p>
+        <form method="post" enctype="multipart/form-data" action="/c/{{c}}/do/upload">
+          <input required type="file" name="file" accept=".csv,.xls,.xlsx,.pdf,.txt"><label><input type="checkbox" name="consent"> Authorise third-party AI analysis of this document</label>
+          <button>Import internal evidence</button></form></details>
+    {% else %}
+      <details><summary>Add a {{category|lower}} source</summary><form method="post" action="/c/{{c}}/do/add">
+        <input required name="title" placeholder="Source title"><input required type="url" name="url" placeholder="https://example.org/news">
+        <input type="hidden" name="category" value="{{category}}">
+        <input required name="reason" placeholder="Why this source matters"><button>Add candidate</button></form></details>
+    {% endif %}
+    {% if category=='Competitors' %}
+      <details><summary>{{competitors|length}} distinct primary-site competitor candidates</summary>
+      {% for comp in competitors %}<article><h3>{{comp.name}}</h3><p>{{comp.reason}}</p><p>{{comp.review}}</p>
+      <blockquote>{{comp.evidence}}</blockquote><a href="{{comp.url}}" target="_blank" rel="noopener noreferrer">Candidate official page</a> · {{comp.status|label}}</article>
+      {% else %}<p>No primary-site competitor candidates found yet. Run discovery or review search quotas.</p>{% endfor %}
+      </details>
+    {% endif %}
+    {% for s in data.source if s.category==category and s.status!='removed' %}
+      <article class="source-entry" id="source-{{s.id}}"><small>{{s.status|label}}{% if s.competitor %} · {{s.competitor}}{% endif %}</small>
+        <h3><a href="{{s.url}}" target="_blank" rel="noopener noreferrer">{{s.title}}</a></h3>
+        <p>{{s.reason}}</p>
+        {% if s.relevance_review %}<p><strong>Current relevance:</strong> {{s.relevance_review.relevance}}/5 · {{s.relevance_review.recommendation}} — {{s.relevance_review.reason}}</p>{% endif %}
+        {% if s.discoveryEvidence %}<details><summary>Discovery evidence</summary><blockquote>{{s.discoveryEvidence}}</blockquote></details>{% endif %}
+        {% if s.category!='Internal' %}
+          <form class="inline-form" method="post" action="/c/{{c}}/do/source" data-source-action="single"><input type="hidden" name="id" value="{{s.id}}">
+          {% if s.status!='approved' %}<button name="status" value="approved">Approve</button>{% else %}<button name="status" value="proposed" class="secondary">Pause</button>{% endif %}
+          <button name="status" value="removed" class="secondary">Remove</button></form>
+        {% endif %}
+        <details><summary>Source history · {{history[s.id]|length}} checks, {{source_docs[s.id]|length}} document versions</summary>
+          {% for run in history[s.id][:12] %}
+            <p><small>{{run.created|readable_date}} · {{run.status|label}} · {{run.collected or 0}} collected · {{run.baseline or 0}} baseline · {{run.duplicates or 0}} duplicates</small></p>
+          {% else %}<p>No monitoring runs yet.</p>{% endfor %}
+          <details><summary>Collected document versions and deduplication</summary>
+          {% for doc in source_docs[s.id][:15] %}<p><a href="{{doc.url}}" target="_blank" rel="noopener noreferrer">{{doc.title}}</a> · {{doc.observation_type or 'Legacy observation'}} · {{doc.published|readable_date}} · fingerprint {{doc.fingerprint[:12]}}</p>{% else %}<p>No collected documents.</p>{% endfor %}</details>
+        </details>
+      </article>
+    {% else %}<p>No currently proposed or approved sources here. Run discovery to obtain candidates.</p>{% endfor %}
+    {% set removed=data.source|selectattr('category','equalto',category)|selectattr('status','equalto','removed')|list %}
+    {% if removed %}<details><summary>{{removed|length}} removed sources (restore a candidate)</summary>
+      {% for s in removed %}<article class="source-entry" id="source-{{s.id}}"><strong>{{s.title}}</strong><p>{{s.reason}}</p>
+        <form method="post" action="/c/{{c}}/do/source" data-source-action="single"><input type="hidden" name="id" value="{{s.id}}"><button name="status" value="proposed" class="secondary">Restore for review</button></form>
+      </article>{% endfor %}
+    </details>{% endif %}
+  </section>
+  <script src="/static/source_manager.js" defer></script>
+{% elif tab=='feed' %}
+  <h2>Intelligence feed & evidence review</h2>
+  <p>Chronological feed includes historical observations for transparency. Only dated recent developments or documented page changes qualify for a current Monday brief. Model assessments are not independent verification.</p>
+  <form class="filter-row"><input type="hidden" name="tab" value="feed">
+    {% for field in ['category','competitor','verification','impact','relevance'] %}<select name="{{field}}" aria-label="{{field}}"><option value="">{{field|title}}</option>
+      {% for value in data.signal|map(attribute=field)|select|unique %}<option value="{{value}}" {{'selected' if request.query_params.get(field)==value else ''}}>{{value}}</option>{% endfor %}
+    </select>{% endfor %}<input type="date" name="date"><button>Filter</button>
+  </form>
+  {% for s in signals %}
+    <article><small>{{s.category}} · Discovered {{s.discovered|readable_date}} · Published {{s.published|readable_date}} · {{s.observation_type or 'Legacy signal'}} · {{s.verification|label}}</small>
+      <h3>{{s.event}}</h3><blockquote>{{s.quote}}</blockquote><p><a href="{{s.url}}" target="_blank" rel="noopener noreferrer">{{s.source}}</a></p>
+      <h4>Potential business implication</h4><p>{{s.why}}</p><h4>Suggested action</h4><p>{{s.action}} · {{s.owner}}</p>
+      <details><summary>Explain priority · {{s.rank}} points</summary>
+        {% if s.observation_type %}<p>Rank weights are: relevance ×3, impact ×3, urgency ×2, reliability ×2, recency ×2, novelty ×1. Evidence strength is tracked separately.</p>
+        {% else %}<p>Archived signal from the previous pipeline; its stored priority used the previous unweighted scoring system (out of 30). Re-monitoring new evidence applies the current weighted scoring system (out of 65).</p>{% endif %}
+        <ul>{% for k in ['relevance','impact','urgency','credibility','recency','novelty','strength'] %}<li>{{k|label}}: {{s[k]}} / 5</li>{% endfor %}</ul>
+      </details>
+      <form method="post" action="/c/{{c}}/do/review" class="filter-row">
+        <input type="hidden" name="id" value="{{s.id}}"><label>Editorial review
+        <select name="review_status">{% for choice in ['unreviewed','approved','needs_review','rejected'] %}<option value="{{choice}}" {{'selected' if (s.review_status or 'unreviewed')==choice else ''}}>{{choice|label}}</option>{% endfor %}</select></label>
+        <input name="note" value="{{s.review_note or ''}}" placeholder="Review reason"><button>Save review</button>
+      </form>
+    </article>
+  {% else %}<p>No signals match these filters. Monitoring will not fabricate updates to fill a report.</p>{% endfor %}
+{% elif tab=='reports' %}
+  <h2>Monday Morning Intelligence Brief</h2>
+  <p>A new brief checks approved sources and reports <strong>all developments from the previous completed Monday–Sunday week</strong>, even if previously reported. It also includes a <strong>separately labelled historical context</strong> section containing previously collected evidence, never misrepresented as new. Unverified or editorially excluded items remain outside the brief.</p>
+  <article>
+    <h3>Evidence readiness</h3>
+    <p><strong>{{coverage.candidates}} proposed</strong> · <strong>{{coverage.approved_public}} approved public sources</strong> · <strong>{{coverage.checked_public}} successfully monitored sources</strong> · <strong>{{coverage.documents}} collected documents</strong> · <strong>{{coverage.signals}} extracted signals</strong>.</p>
+    {% if coverage.approved_public == 0 %}
+      <p><strong>Not ready for a substantive brief:</strong> source candidates have not been approved. <a href="?tab=sources">Review and approve relevant sources</a>, then monitor them.</p>
+    {% elif coverage.checked_public == 0 %}
+      <p><strong>Collection not verified yet:</strong> <a href="?tab=sources">Monitor approved sources</a>. Check <a href="?tab=activity">crawl failures</a> before interpreting any empty report.</p>
+    {% elif coverage.signals == 0 %}
+      <p><strong>No evidence-backed signals yet:</strong> the brief will attempt a limited analysis of older first-crawl documents, but it will not invent current-week events. Check <a href="?tab=activity">monitoring results</a>.</p>
+    {% else %}
+      <p>Saved source-backed intelligence is available. The weekly report will separate previous-week developments from older background.</p>
+    {% endif %}
+  </article>
+  {% if coverage.approved_public > 0 or coverage.documents > 0 %}
+  <div class="tools">
+    {{job('snapshot','Generate initial intelligence snapshot')}}
+    {{job('brief','Monitor & generate last-week brief')}}
+  </div>
+  {% else %}
+  <p><strong>Reports require collected evidence.</strong> <a href="?tab=sources">Approve relevant public sources</a> first; the monitoring and briefing actions will then become available here.</p>
+  {% endif %}
+  <p><small>Use <strong>Initial intelligence snapshot</strong> when onboarding a new company: it summarises evidence across the collected history, always with original dates. Use <strong>Monday Brief</strong> for the previous completed Monday–Sunday week only.</small></p>
+  {% for brief in data.brief %}<article><strong>{{brief.created|readable_date}}</strong>
+    {% if brief.period_type == 'initial-intelligence-snapshot' %} · Initial intelligence snapshot · {{brief.context_signals|length}} dated/undated source-backed observations
+    {% else %} · {{brief.signals|length}} this week{% if brief.context_signals %} · {{brief.context_signals|length}} historical context{% endif %}{% if brief.week_start %} · Week of {{brief.week_start}} to {{brief.week_end}}{% else %} · Legacy rolling-window report{% endif %}{% endif %}
+    <p><a class="btn" href="/c/{{c}}/report/{{brief.id}}">Read evidence-backed brief</a></p></article>
+  {% else %}<p>No report yet.</p>{% endfor %}
+{% elif tab=='activity' %}
+  <h2>Automation and source health</h2><p>Weekly briefs and monthly audits have independent schedules. Errors and partial failures remain visible.</p>
+  <a href="?tab=activity">Refresh status</a>
+  {% if data.run and data.run[0].status=='running' %}<meta http-equiv="refresh" content="6"><p>Current run is in progress. This page refreshes automatically.</p>{% endif %}
+  <h3>Recent runs</h3>
+  {% for run in data.run %}<article><strong>{{run.job|label}}</strong> · {{run.status|label}} · {{'Scheduled' if run.scheduled else 'Manual'}} · {{run.created|readable_date}}
+    {{problem(run.detail)}}</article>{% else %}<p>No runs recorded.</p>{% endfor %}
+  <h2>Monthly source audits</h2>
+  {% for audit in data.audit %}<details><summary>{{audit.created|readable_date}} · {{audit.checks|length}} sources checked</summary>
+    {% if audit.review_method %}<p><strong>Audit method:</strong> {{audit.review_method}}</p>{% endif %}
+    {% if audit.context_revision %}<h3>Last context or answer change</h3><p>Before: {{audit.context_revision.previous or '(none)'}}</p><p>After: {{audit.context_revision.current or '(none)'}}</p>{% endif %}
+    <h3>Source relevance changes since last audit</h3>
+    {% for rev in audit.changed_relevance or [] %}<p><strong>{{rev.source}}</strong> · {{rev.previous_relevance}} → {{rev.relevance}} / 5 · {{rev.reason}}</p>{% else %}<p>No source score changed compared with the preceding audit, or no prior audit exists.</p>{% endfor %}
+    <h3>Current source recommendations</h3>
+    {% for rev in audit.reviews or [] %}<p><strong>{{rev.source}}</strong> · {{rev.recommendation}} · {{rev.relevance}}/5 — {{rev.reason}}</p>{% endfor %}
+    <h3>Proposed source candidates not seen in the preceding audit</h3>{% for suggestion in audit.new_candidate_details or [] %}<p>{% if suggestion.url %}<a href="{{suggestion.url}}">{{suggestion.title}}</a>{% else %}{{suggestion.title}}{% endif %} — {{suggestion.reason}}</p>{% else %}<p>No additional candidates to review.</p>{% endfor %}
+    <h3>Health and duplicate checks</h3>{% for check in audit.checks %}<p>{{check.source}} · {{check.health}} · {{check.recent_duplicates}} recent duplicates{% if check.inactive %} · inactive across three checks{% endif %}</p>{% endfor %}
+    {% for limitation in audit.limitations or [] %}{{problem(limitation)}}{% endfor %}
+  </details>{% else %}<p>No audits yet. Run a manual source audit to produce one.</p>{% endfor %}
+  <h2>Recent crawl history</h2>
+  {% for row in data.crawl[:40] %}<article><strong>{{row.source}}</strong> · {{row.status|label}} · {{row.created|readable_date}}
+    <p>{{row.collected or 0}} stored, {{row.baseline or 0}} baselines, {{row.duplicates or 0}} unchanged/duplicate records, {{row.analysed or 0}} significant signals</p>{{problem(row.detail)}}</article>{% endfor %}
+{% elif tab=='settings' %}
+  <h2>Independent automation settings</h2>
+  <p>The local scheduler runs with the server; hosted execution requires a persistent database and the scheduled GitHub workflow.</p>
+  <form method="post" class="card" action="/c/{{c}}/do/settings">
+  {% for k,t in [('zone','Time zone (e.g., Asia/Kolkata)'),('time','Monday brief time (HH:MM)'),('monitor_hours','Monitoring frequency in hours'),('refresh_days','Source discovery frequency in days'),('audit_day','Monthly audit day (1–28)')] %}
+  <label>{{t}}<input required name="{{k}}" value="{{settings[k]}}"></label>{% endfor %}
+  <label><input type="checkbox" name="enabled" {{'checked' if p.automation}}> Enable recurring jobs for this company</label>
+  <button>Save settings</button></form>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,23 @@
+{% macro content(value) %}
+  {% if value is mapping %}
+    <dl class="research-list">
+    {% for key, item in value.items() %}
+      <div><dt>{{ key|label }}</dt><dd>{{ content(item) }}</dd></div>
+    {% endfor %}
+    </dl>
+  {% elif value is sequence and value is not string %}
+    <ul class="readable-list">
+    {% for item in value %}<li>{{ content(item) }}</li>{% else %}<li>No information available yet.</li>{% endfor %}
+    </ul>
+  {% elif value is sameas true %}Yes
+  {% elif value is sameas false %}No
+  {% elif value is none or value == '' %}Not yet known
+  {% else %}{{ value }}{% endif %}
+{% endmacro %}
+
+{% macro problem(detail) %}
+{% if detail %}
+<p class="notice">{{ detail|issue }}</p>
+<details><summary>Technical details</summary><p>{{ detail }}</p></details>
+{% endif %}
+{% endmacro %}

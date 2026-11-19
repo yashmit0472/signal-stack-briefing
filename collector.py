@@ -43,6 +43,23 @@ def allowed(url):
         return delay
 def crawl(url):
     import feedparser
+    import re
+    from datetime import datetime,timezone
+    p=urlsplit(url)
+    match=re.match(r'/questions/(\d+)',p.path)
+    if match and (p.hostname in ('stackoverflow.com','serverfault.com','superuser.com','askubuntu.com','mathoverflow.net') or p.hostname.endswith('.stackexchange.com')):
+        site=p.hostname.split('.')[0]
+        r=requests.get('https://api.stackexchange.com/2.3/questions/'+match[1],params={'site':site,'filter':'withbody'},timeout=18)
+        r.raise_for_status()
+        data=r.json()
+        if data.get('backoff'):time.sleep(data['backoff'])
+        result=[]
+        for e in data['items']:
+            text=BeautifulSoup(e['body'],'html.parser').get_text(' ',strip=True)
+            d=record(e['link'],e['title'],text,datetime.fromtimestamp(e['creation_date'],timezone.utc).isoformat())
+            d['attribution']=e['owner'].get('display_name','Contributor')+' · '+e.get('content_license','')
+            result.append(d)
+        return result
     for _ in range(4):
         delay=allowed(url)
         with fetch(url,delay) as r:
@@ -63,10 +80,14 @@ def crawl(url):
         return [record(url,url.split('/')[-1],' '.join(p.extract_text() or '' for p in PdfReader(BytesIO(raw)).pages[:25]),'')]
     soup=BeautifulSoup(raw,'html.parser')
     title=soup.title.get_text(' ',strip=True) if soup.title else url
-    date=soup.select_one('meta[property="article:published_time"]')
+    date=soup.select_one('meta[property="article:published_time"],meta[name="govuk:first-published-at"]')
+    published=date.get('content','') if date else ''
+    if not published:
+        tag=soup.select_one('.gem-c-published-dates time[datetime]')
+        if tag:published=tag.get('datetime','')
     for node in soup.select('script,style,nav,footer,header,aside,noscript'): node.decompose()
     main=soup.select_one('article') or soup.select_one('main') or soup
-    return [record(url,title,main.get_text(' ',strip=True),date.get('content','') if date else '')]
+    return [record(url,title,main.get_text(' ',strip=True),published)]
 def record(url,title,body,date):
     body=' '.join(body.split())[:30000]
     return dict(url=urldefrag(url)[0],title=title,text=body,published=date,discovered=now(),fingerprint=hashlib.sha256(body.encode()).hexdigest())

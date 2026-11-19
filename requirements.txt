@@ -5,7 +5,6 @@ python-multipart>=0.0.18
 requests>=2.32,<3
 beautifulsoup4>=4.12,<5
 python-dotenv>=1,<2
-apscheduler>=3.10,<4
 pytz
 pypdf>=4
 openpyxl>=3.1

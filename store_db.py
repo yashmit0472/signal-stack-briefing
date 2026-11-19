@@ -7,15 +7,16 @@ from dotenv import load_dotenv
 load_dotenv()
 URL=os.getenv('DATABASE_URL')
 def now():
-    return datetime.now(timezone.utc).isoformat(timespec='seconds')
+    return datetime.now(timezone.utc).isoformat(timespec='microseconds')
 @contextmanager
 def db():
     if URL:
         import psycopg2
         conn=psycopg2.connect(URL)
     else:
-        Path('data').mkdir(exist_ok=True)
-        conn=sqlite3.connect('data/signals.db',timeout=30)
+        db_file=Path(os.getenv('SIGNAL_DB_PATH','data/signals.db'))
+        db_file.parent.mkdir(parents=True,exist_ok=True)
+        conn=sqlite3.connect(str(db_file),timeout=30)
     try:
         yield conn
         conn.commit()

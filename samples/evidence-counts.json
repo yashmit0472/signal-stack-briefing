@@ -1,0 +1,30 @@
+[
+  {
+    "company": "Fairphone",
+    "approved": 12,
+    "competitor_candidates": 5,
+    "collected_documents": 12,
+    "signals_in_latest_brief": 7,
+    "briefs": 5,
+    "saved_questions": 1
+  },
+  {
+    "company": "MeetUniversity",
+    "approved": 67,
+    "competitor_candidates": 10,
+    "collected_documents": 61,
+    "signals_in_latest_brief": 1,
+    "briefs": 6,
+    "saved_questions": 10,
+    "approved_competitor_sources": 7
+  },
+  {
+    "company": "Ghost",
+    "approved": 15,
+    "competitor_candidates": 6,
+    "collected_documents": 14,
+    "signals_in_latest_brief": 8,
+    "briefs": 5,
+    "saved_questions": 1
+  }
+]

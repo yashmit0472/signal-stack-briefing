@@ -1,1 +1,108 @@
-<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{{r.company}} · Monday Morning Brief</title><style>body{font:16px/1.6 Georgia,serif;max-width:850px;margin:32px auto;padding:0 24px;color:#18382d}h1{font-size:44px;line-height:1.1}h2{border-top:1px solid #b4c3b9;padding-top:18px}a{color:#185e45}small{color:#52675b}blockquote{border-left:3px solid #9bb28f;padding-left:16px}@media print{form,nav{display:none}}</style><body>{% if not download %}<nav><a href="/c/{{c}}?tab=reports">Brief history</a> · <a href="?download=true">Export HTML</a></nav>{% endif %}<h1>Monday Morning Brief</h1><p>{{r.company}} · Discovery window {{r.start[:10]}} – {{r.end[:10]}}</p>{% macro show(s) %}<p><strong>{{s.event}}</strong> <a href="{{s.url}}">Evidence</a><br>{{s.why}}</p>{% endmacro %}<h2>1. Executive Summary</h2>{% for s in r.signals[:5] %}{{show(s)}}{% endfor %}{% if r.signals|length<5 %}<p>{{r.signals|length}} supported developments available for this window.</p>{% endif %}{% for cat,title in [('Customers','2. Customer Signals'),('Competitors','3. Competitor Intelligence'),('Market','4. Market Intelligence'),('Internal','5. Internal Business Intelligence')] %}<h2>{{title}}</h2>{% for s in r.signals if s.category==cat %}{{show(s)}}{% else %}<p>No meaningful development established from available evidence.</p>{% endfor %}{% endfor %}<h2>6. Opportunities Identified</h2>{% set opp=r.signals|selectattr('type','equalto','opportunity')|list %}{% for s in opp %}{{show(s)}}<p>Impact {{s.impact}}/5 · Priority {{s.rank}}/30 · Next step: {{s.action}}</p>{% endfor %}{% if opp|length<3 %}<p>Evidence supports {{opp|length}} opportunities, below the target of three.</p>{% endif %}<h2>7. Risks &amp; Threats</h2>{% for s in r.signals if s.type=='threat' %}{{show(s)}}<p>Urgency {{s.urgency}}/5</p>{% else %}No supported threats identified.{% endfor %}<h2>8. Recommended Actions for This Week</h2>{% for s in r.signals if s.action %}<p><strong>{{s.action}}</strong><br>{{s.why}} · Suggested owner: {{s.owner}} · {{actions.get(s.id,'Open')}}</p>{% if not download %}<form method="post" action="/c/{{c}}/do/track"><input type="hidden" name="id" value="{{s.id}}"><select name="status"><option>Open</option><option>In progress</option><option>Done</option></select><button>Update action</button></form>{% endif %}{% else %}Insufficient evidence for an action.{% endfor %}<h2>9. What We Should Watch</h2>{% for s in r.signals if s.urgency|int<=3 %}{{show(s)}}{% else %}No early developments identified.{% endfor %}<h2>10. Source Appendix</h2>{% for s in r.signals %}<p><a href="{{s.url}}">{{s.source}}</a> · {{s.verification}}<br>Published {{s.published or 'unknown'}} · Discovered {{s.discovered}} · Event date {{s.event_date}}</p><blockquote>{{s.quote}}</blockquote>{% else %}No developments cited.{% endfor %}</body></html>
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{{r.company}} · {{'Initial Intelligence Snapshot' if r.get('period_type')=='initial-intelligence-snapshot' else 'Monday Morning Brief'}}</title>
+<style>
+:root{color-scheme:light}body{font:16px/1.6 Georgia,serif;max-width:940px;margin:36px auto;padding:0 26px;color:#17392e;background:#fff}
+h1{font-size:43px;line-height:1.1;margin-bottom:6px}h2{border-top:1px solid #b4c3b9;padding-top:18px;margin-top:38px;font-size:28px}h3{font-size:20px;margin:10px 0 4px}a{color:#17654c}small{color:#52675b}
+blockquote{border-left:3px solid #91b092;padding-left:16px;margin:13px 0}button,select{padding:7px;font:14px sans-serif}
+.signal{padding:14px 0;border-bottom:1px solid #eceeea}.label{font:12px/1.6 sans-serif;letter-spacing:.05em;text-transform:uppercase;color:#52675b}
+.note{background:#f4f7f3;border-left:3px solid #819c88;padding:13px 17px;margin:16px 0}
+.old{border-left:3px solid #c9b897;background:#fcfaf4;padding:11px 16px;margin:12px 0}.old blockquote{border-left-color:#d5c29e}
+.empty{color:#52675b;font-style:italic}.summary-strip{display:flex;gap:12px;flex-wrap:wrap;margin:15px 0 20px;font:14px sans-serif}
+.summary-strip div{background:#f1f4f0;border:1px solid #d5ddd4;border-radius:7px;padding:10px 15px;min-width:150px}.summary-strip strong{display:block;font-size:23px}
+.explainer{font:14px/1.55 sans-serif;color:#53645b}.archive-label{font:12px/1.5 sans-serif;letter-spacing:.03em;text-transform:uppercase;color:#745c35;font-weight:700}
+@media print{nav,form{display:none}body{margin:0;max-width:none}.old{break-inside:avoid}.signal{break-inside:avoid}}
+</style></head><body>
+{% if not download %}<nav><a href="/c/{{c}}?tab=reports">← All saved briefs</a> · <a href="?download=true">Download email/print-ready HTML</a></nav>{% endif %}
+{% set synthesis=r.get('synthesis',{}) %}
+{% set comparison=r.get('comparison',{}) %}
+{% set historical=r.get('context_signals',[]) %}
+{% set current=r.signals %}
+{% set is_snapshot=r.get('period_type')=='initial-intelligence-snapshot' %}
+<h1>{{'Initial Intelligence Snapshot' if is_snapshot else 'Monday Morning Brief'}}</h1>
+{% if is_snapshot %}<p><strong>{{r.company}}</strong> · Compiled {{r.snapshot_date|readable_date}} · Prior collected evidence only</p>
+<div class="summary-strip"><div><strong>{{historical|length}}</strong>Evidence-backed observations</div><div><strong>{{historical|selectattr('category','equalto','Competitors')|list|length}}</strong>Competitor context items</div><div><strong>{{historical|selectattr('category','equalto','Customers')|list|length}}</strong>Customer context items</div></div>
+{% else %}<p><strong>{{r.company}}</strong> · Reporting week {{r.week_start or r.start[:10]}} to {{r.week_end or r.end[:10]}}{% if r.timezone %} ({{r.timezone}}){% endif %}</p>
+<div class="summary-strip"><div><strong>{{current|length}}</strong>Within reporting week</div><div><strong>{{historical|length}}</strong>Historical context items</div><div><strong>{{(current|selectattr('category','equalto','Competitors')|list)|length}}</strong>Current competitor signals</div></div>{% endif %}
+{% set coverage=r.get('coverage',{}) %}
+{% if coverage %}
+<div class="note"><strong>Evidence coverage at report creation:</strong>
+{{coverage.candidates}} proposed sources (not monitored) · {{coverage.approved_public}} approved public sources ·
+{{coverage.checked_public}} successfully crawled · {{coverage.documents}} stored documents ·
+{{coverage.signals}} extracted signals.
+{% if coverage.approved_public == 0 %}<p><strong>Setup incomplete:</strong> no public sources have been approved. Review candidates in the <a href="/c/{{c}}?tab=sources">Source manager</a> before treating this as a substantive intelligence report.</p>
+{% elif coverage.checked_public == 0 %}<p><strong>Collection incomplete:</strong> no approved public source has yet completed a successful crawl. Review the <a href="/c/{{c}}?tab=activity">monitoring history</a>.</p>
+{% elif coverage.signals == 0 %}<p><strong>Extraction incomplete:</strong> documents may exist, but no evidence-backed developments have been extracted; check analysis errors and source quality.</p>{% endif %}
+</div>
+{% endif %}
+<p class="note"><strong>How to read this report:</strong>
+{% if is_snapshot %}This initial snapshot is a historical evidence dossier, <strong>not a weekly news report</strong>. All observations retain their original dates and links. No item is represented as newly published this week.
+{% else %}Only events with dates inside the stated week (or documented changes observed during it) count as this week's developments.{% endif %} Previously collected evidence is shown separately under <em>Historical context — not new</em>, with its original dates and links. Older signals are never claimed as recent, and AI interpretation is not proof of the underlying event.</p>
+{% macro signal(row, details=True, historic=False) %}
+<div class="{{'old' if historic else 'signal'}}">
+<div class="{{'archive-label' if historic else 'label'}}">{{'HISTORICAL CONTEXT · NOT NEW · ' if historic else 'THIS WEEK · '}}{{row.category}} · Priority {{row.rank or 'not scored'}} · {{row.verification|label}}</div>
+<h3>{{row.event}}</h3>
+<p><strong>Source:</strong> <a href="{{row.url}}" target="_blank" rel="noopener noreferrer">{{row.source or row.url}}</a> · <strong>Published:</strong> {{row.published|readable_date}} · <strong>Event:</strong> {{row.event_date|readable_date}}</p>
+{% if details %}<blockquote>{{row.quote}}</blockquote>
+<p><strong>Interpretation (not a source fact):</strong> {{row.why}}</p>
+{% if historic %}<p class="explainer"><strong>Before action:</strong> Verify this older information is still applicable. Original suggested action: {{row.action or 'Not available'}}{% else %}<p><strong>Consider:</strong> {{row.action or 'Assess impact'}} · Suggested owner: {{row.owner or 'Not specified'}}</p>{% endif %}
+{% endif %}</div>
+{% endmacro %}
+<h2>1. {{'Evidence overview' if is_snapshot else 'Executive summary — priority developments'}}</h2>
+<p>{{synthesis.summary or 'The source-backed developments and interpretations are detailed below.'}}</p>
+{% if is_snapshot and historical %}
+<p><strong>Highest-ranked historical evidence to revalidate:</strong></p>{% for row in historical[:5] %}{{signal(row,False,True)}}{% endfor %}
+{% elif current %}
+{% set selected=synthesis.top_ids or [] %}
+{% for id in selected[:5] %}{% for row in current if row.id==id %}{{signal(row,False)}}{% endfor %}{% endfor %}
+{% else %}<p class="empty">{{'No evidence-backed observations available; approve, crawl and analyse sources first.' if is_snapshot else 'No evidence-backed developments within this reporting week were found in the saved records. This does not establish that nothing happened; check collection coverage.'}}</p>{% endif %}
+{% if historical and not is_snapshot %}<p><strong>Context available:</strong> {{historical|length}} earlier, source-backed items are included below for strategic background. These are <strong>not</strong> new developments or proof that the underlying conditions persist.</p>{% endif %}
+{% if current and not is_snapshot %}<h3>Comparison with last saved brief</h3>
+<p class="explainer">{{current|length}} developments in the current reporting week. {{comparison.repeated_from_previous_brief or 0}} were also in the previous brief; {{comparison.not_in_previous_brief or 0}} were not. An item is never omitted just because it appeared in an earlier brief.{% if comparison.previous_brief_date %} Previous brief generated {{comparison.previous_brief_date|readable_date}}.{% endif %}</p>
+{% endif %}
+{% for cat,title in [('Customers','2. Customer signals'),('Competitors','3. Competitor intelligence'),('Market','4. Market intelligence'),('Internal','5. Internal business intelligence')] %}
+<h2>{{title}}</h2>
+{% set active=current|selectattr('category','equalto',cat)|list %}
+{% set older=historical|selectattr('category','equalto',cat)|list %}
+{% if active %}<h3>Developments within the reporting week ({{active|length}})</h3>{% for row in active %}{{signal(row)}}{% endfor %}
+{% else %}{% if not is_snapshot %}<p class="empty">No qualifying new {{cat|lower}} developments recorded for this week.</p>{% endif %}{% endif %}
+{% if older %}<h3>{{'Collected evidence (' if is_snapshot else 'Previously collected context ('}}{{older|length}}) — not new</h3><p class="explainer">{{'These observations were collected at different times and are not being presented as current-week news.' if is_snapshot else 'These items are dated before the reporting week or have no confirmed event date. They are retained for context, not counted as new activity.'}}</p>{% for row in older %}{{signal(row,True,True)}}{% endfor %}{% endif %}
+{% endfor %}
+<h2>6. Evidence-backed opportunities</h2>
+{% set opportunities=current|selectattr('type','equalto','opportunity')|list %}
+{% for row in opportunities %}
+<h3>{{row.event}}</h3><p><strong>Potential impact:</strong> {{row.impact}}/5 · <strong>Priority score:</strong> {{row.rank}} · <strong>Suggested next step:</strong> {{row.action}}</p>
+<p><strong>Interpretation:</strong> {{row.why}} · <a href="{{row.url}}">Original evidence</a></p>
+{% else %}{% if not is_snapshot %}<p class="empty">No newly dated opportunities have sufficient saved evidence for this week. None have been invented to fill a quota.</p>{% endif %}{% endfor %}
+{% set old_opps=historical|selectattr('type','equalto','opportunity')|list %}
+{% if old_opps %}<h3>Historical opportunity hypotheses to revalidate</h3>
+{% for row in old_opps[:4] %}<p><strong>{{row.event}}</strong> — earlier source: <a href="{{row.url}}">{{row.source}}</a> ({{row.event_date|readable_date if row.event_date else row.published|readable_date}}). Before prioritising, verify the problem and market conditions still exist.</p>{% endfor %}{% endif %}
+<h2>7. Risks and threats</h2>
+{% set threats=current|selectattr('type','equalto','threat')|list %}
+{% for row in threats %}<h3>{{row.event}}</h3><p><strong>Potential impact (interpretation):</strong> {{row.why}} · <strong>Urgency:</strong> {{row.urgency}}/5 · <a href="{{row.url}}">Evidence</a></p>
+{% else %}{% if not is_snapshot %}<p class="empty">No new threat in the reporting week met the saved evidence/date checks.</p>{% endif %}{% endfor %}
+{% set old_threats=historical|selectattr('type','equalto','threat')|list %}
+{% if old_threats %}<h3>Previously reported risks (re-check status)</h3>{% for row in old_threats[:4] %}<p><strong>{{row.event}}</strong> — <a href="{{row.url}}">historical source</a>; check whether the risk remains current before escalating.</p>{% endfor %}{% endif %}
+<h2>8. Recommended actions for this week</h2>
+{% for row in current if row.action %}
+<div class="signal"><p><strong>{{loop.index}}. {{row.action}}</strong></p><p>Evidence: <a href="{{row.url}}">{{row.source}}</a> · Reason (interpretation): {{row.why}} · Suggested owner: {{row.owner}} · Status: {{actions.get(row.id,'Open')}}</p>
+{% if not download %}<form method="post" action="/c/{{c}}/do/track"><input type="hidden" name="id" value="{{row.id}}"><select name="status"><option>Open</option><option>In progress</option><option>Done</option></select><button>Save action status</button></form>{% endif %}</div>
+{% else %}{% if not is_snapshot %}<p class="empty">No action can be attributed to a newly dated signal this week.</p>{% endif %}{% endfor %}
+{% if historical %}<h3>Evidence maintenance actions</h3><p>Re-check the most relevant older evidence before using it for strategic decisions. Start with:</p>
+{% for row in historical[:3] %}<p>{{loop.index}}. <strong>Revalidate:</strong> {{row.event}} · <a href="{{row.url}}">Source</a> · Confirm whether the recommendation still applies.</p>{% endfor %}{% endif %}
+<h2>9. What leadership should watch</h2>
+{% for id in synthesis.watch_ids or [] %}{% for row in current if row.id==id %}<p><strong>{{row.event}}</strong> — {{row.why}} <a href="{{row.url}}">Monitor the source</a></p>{% endfor %}
+{% else %}
+{% if historical %}<p>Monitor any new updates to the underlying sources listed in the historical context section, especially those marked for revalidation. An earlier item does not prove that an issue is ongoing.</p>
+{% else %}<p>Review approved source coverage and run scheduled monitoring; there is not enough evidence to name a specific emerging trend.</p>{% endif %}
+{% endfor %}
+<h2>10. Traceable source appendix</h2>
+{% if not is_snapshot %}<h3>This week's supporting sources</h3>{% endif %}
+{% for row in current %}<div class="signal"><strong>{{row.source}}</strong> · <a href="{{row.url}}" target="_blank" rel="noopener noreferrer">Original link</a>
+<p>Published: {{row.published|readable_date}} · Discovered: {{row.discovered|readable_date}} · Event date: {{row.event_date|readable_date}}</p>
+<p>Reliability: {{row.credibility or 'not scored'}}/5 · Evidence strength: {{row.strength or 'not scored'}}/5 · Verification: {{row.verification|label}} · Observation: {{row.observation_type or 'legacy'}}</p><blockquote>{{row.quote}}</blockquote></div>
+{% else %}{% if not is_snapshot %}<p class="empty">No new qualifying sources dated to the reporting week.</p>{% endif %}{% endfor %}
+{% if historical %}<h3>{{'Collected evidence and original dates' if is_snapshot else 'Earlier/undated source appendix (historical only)'}}</h3>
+{% for row in historical %}<p><span class="archive-label">Not new</span> · <a href="{{row.url}}" target="_blank" rel="noopener noreferrer">{{row.source or row.event}}</a> · Published {{row.published|readable_date}} · Event {{row.event_date|readable_date}} · Verification {{row.verification|label}}</p>{% endfor %}{% endif %}
+{% if synthesis.limitations %}<h2>Limitations and editorial cautions</h2><ul>{% for note in synthesis.limitations %}<li>{{note}}</li>{% endfor %}</ul>{% endif %}
+</body></html>
