@@ -1,8 +1,8 @@
-# Deployment — GitHub + Render + persistent database
+# Deployment — Vercel, Render and PostgreSQL
 
-This is a ready-to-configure deployment recipe, **not** evidence of a live deployment.
+Render runs FastAPI and the monitoring jobs it starts. The Vercel project uses the `vercel/` root directory with the **Other** framework preset. Its rewrite forwards app requests to Render and sets private, non-cacheable responses. For a different backend, update the destination in `vercel/vercel.json`.
 
-1. **GitHub repository:** Upload only the `SignalStack_GitHub_Safe.zip` contents. Confirm `.env`, `data/`, `.git/`, virtual environments and `tmp/` are absent. Never commit API keys. The supplied `render.yaml` describes the service.
+1. **GitHub repository.** Push the source code and public demo seed. Keep local `.env` files, databases, virtual environments, and backups out of the repository. The supplied `render.yaml` describes the backend.
 2. **Free PostgreSQL:** Provision a persistent PostgreSQL database on a provider with a genuinely free tier. Copy its private connection string (including `sslmode=require` if the provider requires it). This project supports `DATABASE_URL` using `psycopg2`. Do not use Render's ephemeral disk for SQLite in production.
 3. **Render web service:** Import the repository as a new blueprint or web service using `render.yaml` and select an available free plan. Set `DATABASE_URL`, `GEMINI_API_KEY` and `TAVILY_API_KEY` as **private dashboard environment variables**; use the `GEMINI_MODEL` that is free and available to your own key. `APP_PASSWORD` should be a strong generated secret. `EXTERNAL_SCHEDULER=1` prevents duplicate local scheduling. `SEED_DEMO_ON_START=1` loads the three existing historical demo datasets exactly once (idempotent).
 4. **Start command:** `python seed_demo.py && uvicorn app:app --host 0.0.0.0 --port $PORT`. On startup, visit the assigned HTTPS URL and log in with HTTP Basic username `founder` and the generated `APP_PASSWORD`. Check that MeetUniversity, Ghost and Fairphone appear with historical research and source history. Real API calls still require your keys and provider quotas.

@@ -1,0 +1,17 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "outputDirectory": "public",
+  "headers": [
+    {
+      "source": "/:path*",
+      "headers": [{ "key": "Cache-Control", "value": "private, no-store" }]
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/:path*",
+      "destination": "https://signal-stack-z7gc.onrender.com/:path*"
+    }
+  ]
+}
