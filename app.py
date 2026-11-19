@@ -40,6 +40,8 @@ def stop():
     scheduler_stop.set()
 @app.middleware('http')
 async def protect(req,call):
+    if os.getenv('PUBLIC_DEMO')=='1':
+        return await call(req)
     pw=os.getenv('APP_PASSWORD','')
     if os.getenv('RENDER') and not pw:return PlainTextResponse('Set APP_PASSWORD before publishing',503)
     if pw:
