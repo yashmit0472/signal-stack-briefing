@@ -4,11 +4,19 @@
   "outputDirectory": "vercel/public",
   "headers": [
     {
+      "source": "/",
+      "headers": [{ "key": "Cache-Control", "value": "private, no-store" }]
+    },
+    {
       "source": "/:path*",
       "headers": [{ "key": "Cache-Control", "value": "private, no-store" }]
     }
   ],
   "rewrites": [
+    {
+      "source": "/",
+      "destination": "https://signal-stack-z7gc.onrender.com/"
+    },
     {
       "source": "/:path*",
       "destination": "https://signal-stack-z7gc.onrender.com/:path*"
