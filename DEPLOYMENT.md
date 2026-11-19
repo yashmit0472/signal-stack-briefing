@@ -1,6 +1,6 @@
 # Deployment — Vercel, Render and PostgreSQL
 
-Render runs FastAPI and the monitoring jobs it starts. The Vercel project uses the `vercel/` root directory with the **Other** framework preset. Its rewrite forwards app requests to Render and sets private, non-cacheable responses. For a different backend, update the destination in `vercel/vercel.json`.
+Render runs FastAPI and the monitoring jobs it starts. Import the repository root into Vercel with the **Other** framework preset. Vercel serves `vercel/public`, and its rewrite forwards app requests to Render with private, non-cacheable responses. For a different backend, update the destination in `vercel.json`.
 
 1. **GitHub repository.** Push the source code and public demo seed. Keep local `.env` files, databases, virtual environments, and backups out of the repository. The supplied `render.yaml` describes the backend.
 2. **Free PostgreSQL:** Provision a persistent PostgreSQL database on a provider with a genuinely free tier. Copy its private connection string (including `sslmode=require` if the provider requires it). This project supports `DATABASE_URL` using `psycopg2`. Do not use Render's ephemeral disk for SQLite in production.
